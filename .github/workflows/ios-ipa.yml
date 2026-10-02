@@ -1,0 +1,50 @@
+name: iOS IPA
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rust targets
+        run: |
+          rustup target add aarch64-apple-ios aarch64-apple-ios-sim
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ios-core
+
+      - name: Build unsigned archive
+        working-directory: apps/ios
+        run: |
+          xcodebuild \
+            -project Zeron.xcodeproj \
+            -scheme Zeron \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/Zeron.xcarchive" \
+            archive \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Create IPA
+        run: |
+          mkdir Payload
+
+          cp -R \
+            "$RUNNER_TEMP/Zeron.xcarchive/Products/Applications/Zeron.app" \
+            Payload/Zeron.app
+
+          zip -qry Zeron.ipa Payload
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: Zeron-iOS
+          path: Zeron.ipa
